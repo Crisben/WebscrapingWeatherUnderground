@@ -1,4 +1,4 @@
-## Webscraping Weather Underground by station
+## Webscraping Weather Underground by station with R and RSelenium
 
 Weather Underground provides local & long-range weather forecasts, weather reports, maps & tropical weather conditions for locations worldwide.
 
