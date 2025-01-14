@@ -1,0 +1,142 @@
+---
+title: "WebscrapingWeatherUnderground"
+---
+
+## Webscraping Weather Underground by station
+
+Weather Underground provides local & long-range weather forecasts, weather reports, maps & tropical weather conditions for locations worldwide.
+
+On this site we can obtain daily data (up to hourly) of the maximum, minimum and average of:
+
+Temperature
+
+Dew Point
+
+Humidity
+
+Speed
+
+Pressure
+
+Precip. Accum.
+
+
+## Libraries to use
+
+```{r}
+library(tidyverse)
+library(RSelenium)
+library(XML)
+library(rvest)
+library(httr)
+```
+
+## Stations and dates for consulting
+
+This are some stations from Ecuador
+
+```{r}
+estaciones <- c('ICUENC39')
+
+# some stations
+# c('ICUENC39','ICUENC33','ICUENC28','ICUENC29','IAZUAYPA2','IAZOGU6','IMIRA73','IESPEJ1','IESPEJ3','IPALLA28','IPUJIL2','IPUJIL1','ILATAC32','ILATAC17','ILATAC12','ILATAC30','ILATAC29','IATACA1','IESMER13','IGALAP21','IBALAO4','IGUAYAQU13','IPAJAN30','IPAJAN3','IGUAYA86','IGUAYA81','IGUAYA46','ICORON18','IDURNC4','IPAJAN25','ISAMBO9','ISAMBO7','IGUAYA85','ISIMNB2','ISAMBO8','ICOLIM9','IOTAVA2','IIBARR6','IIBARR3','ISANMI56','IPIMAM1','IIBARR10','IURCUQ1','IIBARR5','ILOJAC14','ILOJAC17','ILOJAC15','ILOJAC19','ILOJACAN8','ILOJAC11','ICATAMAY2','ILOJAC8','ILOJAC5','ILOJACAN7','ILOJAC6','IPUEBL93','IBABA7','IQUEVE10','IPORTOVE21','IARENI1','IPASAJ5','IELGUA6','IJIPIJ1','IMANABPU2','IBOLVA15','IMANTA6','IPORTO307','ICHONE1','ISUCRE13','ISUCRE15','IHUAMB1','ITENAC7','ITENA1','IQUITO70','IMEJAC1','IPICHINC3','IRUMIA18','IRUMIA9','IQUITO29','IQUITO32','IQUITO79','IQUITO88','IQUITO67','ISANMI50','ICAYAM8','IPUERT106','ICAYAM1','IQUITO89','IQUITO38','ISANTA1184','ILALIB6','IGUAYA72','IGUAYA82','IGUAYA84','IGUAYA76','IGUAYA63','ISANTO190','IMOCHA6','IBAOSD5','IBAOSDEA3','IMOCHA5','ICEVAL4','IAMBAT12','ITUNGURA2','IPLLAR1','IURCUQ1','IMEJAC1','IPUJIL1','ITENA1','ITENAC7','IQUEVE10','IMANTA6','IJIPIJ1','IPUEBL93','IARENI1','IELGUA7','IGUAYA72','IGUAYAQU13','ISAMBO7','IELGUA6','ILOJAC14','ICUENC33','ICUENC29','ISIMNB2','ILATAC12','IQUITO79','IQUITO91','IQUITO67')
+
+monthSearch <- ifelse(1:12<10, paste0("0",1:12), 1:12)
+monthSearch <- monthSearch[1:3]     # sample
+yearFrom <- 2024
+yearTo <- 2024
+```
+
+## Url estructure
+
+[https://www.wunderground.com/dashboard/pws/](https://www.wunderground.com/dashboard/pws/ISANMI50%22) Station "/table/" date from / date to / type
+
+Type can be daily (1 register per hour), weekly or monthly (1 register per day)
+
+Query by day
+
+<https://www.wunderground.com/dashboard/pws/ICOTAC7/table/2024-01-8/2024-01-8/monthly>
+
+![](images/clipboard-149121340.png)
+
+## Browser config
+
+```{r}
+rD <- RSelenium::rsDriver(port = 43166L,browser = c("firefox"), chromever = NULL)
+remDr <- rD[["client"]]
+```
+
+## List of dates and stations
+
+```{r}
+dates <- list(0)
+
+for(i in yearFrom:yearTo){
+        dates[[i-yearFrom+1]] <-  paste0(rep(i,12),"-", monthSearch, "-12")
+}
+
+dates <- unlist(dates)
+
+url_estacion <- paste0("https://www.wunderground.com/dashboard/pws/", estaciones, "/table/")
+
+url <- list(0)
+
+for(i in 1:length(url_estacion)){
+        url[[i]] <- paste0(url_estacion[i], dates,"/", dates, "/monthly")
+}
+
+url <- unlist(url)
+```
+
+## Process
+
+```{r}
+
+dir <- "https://www.google.com"
+
+remDr$navigate(dir)
+
+data <- list(0)
+
+for(i in 1:length(url)){
+    tryCatch({
+        remDr$navigate(url[i])
+        Sys.sleep(2)
+        
+        tmp <- remDr$getPageSource()[[1]] %>%
+            read_html() %>%
+            html_table()
+        
+        # save data
+        data[[i]] <- tmp[[4]]
+        data[[i]]$url <- url[i]
+        
+        # print to check advance
+        print(i)
+        print(url[i])
+        print(head(data[[i]]))
+    }, error = function(e) {
+        # Manejar el error, como imprimir un mensaje de error y continuar
+        message("Error en la iteración ", i, ": ", conditionMessage(e))
+        # Opcional: guardar información sobre el error
+        data[[i]] <- data.frame(Error = "Error durante la extracción", url = url[i])
+    })
+}
+
+
+data_df <- do.call(rbind, data)
+```
+
+## Results
+
+```{r}
+head(data_df)
+```
+
+## Export
+
+```{r}
+write.csv2(data_df, 
+           paste0("data_df_wunder", Sys.Date(), ".csv"),
+           row.names = F, fileEncoding = "latin1")
+```
